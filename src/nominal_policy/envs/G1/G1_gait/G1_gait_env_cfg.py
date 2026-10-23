@@ -11,8 +11,9 @@ from lib.domain_randomizer.commander import UniformVelocityCommandCfg
 from lib.env.G1.base.G1_base_env_cfg import G1BaseEnvCfg
 from lib.utils.plot_utils import PNGSavePlotter
 
+# Training Environment
 @configclass
-class G1RecoveryEnvCfg(G1BaseEnvCfg):
+class G1GaitEnvCfg(G1BaseEnvCfg):
     ## ==================== Environment parameters ==================== ##
     episode_length_s = 10.0
     sim_dt = 1/200
@@ -21,8 +22,8 @@ class G1RecoveryEnvCfg(G1BaseEnvCfg):
     ## ========== Multi Agent Setting =========== ##
     possible_agents = ["arm", "leg"]
     action_space = {"arm": 17, "leg": 12}                         
-    observation_space = {"arm": 65, "leg": 50}                
-    state_space = {"arm": 102, "leg": 102}
+    observation_space = {"arm": 63, "leg": 48}                
+    state_space = {"arm": 100, "leg": 100}
     num_agents = 2
     action_scale_factor = {"arm": [0.5, ()], 
                            "leg": [0.5, ()]}
@@ -39,13 +40,16 @@ class G1RecoveryEnvCfg(G1BaseEnvCfg):
     w_track_height : float = 1.0
     w_feet_gait:      float = 6.0
     w_support_xy:     float = 1.0
-    w_flat:           float = 2.0
+    w_upright:           float = 2.0
+    w_single_contact:     float = 1.0
+    w_feet_air_time:      float = 1.0
 
     w_lin_vel_z:          float = 2.0
     w_ang_vel_xy:         float = 0.1
     w_joint_torque:       float = 1.0e-7
     w_joint_torque_limit: float = 1.0e-5
     w_joint_vel:          float = 1.0e-4
+
 
     w_limits:            float = 10.0
     w_deviation_swing:   float = 2.0
@@ -62,7 +66,8 @@ class G1RecoveryEnvCfg(G1BaseEnvCfg):
     # ===== Gait guidance ===== #
     time_period = 0.35
     z_c = 0.75
-
+    single_contact_window = 0.2     # [s] look-back window for single-foot contact
+    air_time_threshold = 0.4        # [s] target swing duration
 
     ## ============== Self collision =============== ##
     allowed_collision_bodies = ["left_ankle_pitch_link",
@@ -89,15 +94,12 @@ class G1RecoveryEnvCfg(G1BaseEnvCfg):
     goal_vel_visualizer_cfg: VisualizationMarkersCfg = GREEN_ARROW_X_MARKER_CFG.replace(
         prim_path="/Visuals/Command/velocity_goal"
     )
-
     current_vel_visualizer_cfg: VisualizationMarkersCfg = BLUE_ARROW_X_MARKER_CFG.replace(
         prim_path="/Visuals/Command/velocity_current"
     )
-
     goal_ang_vel_visualizer_cfg: VisualizationMarkersCfg = GREEN_ARROW_X_MARKER_CFG.replace(
         prim_path="/Visuals/Command/angular_velocity_goal"
     )
-
     current_ang_vel_visualizer_cfg: VisualizationMarkersCfg = BLUE_ARROW_X_MARKER_CFG.replace(
         prim_path="/Visuals/Command/angular_velocity_current"
     )
@@ -118,9 +120,9 @@ class G1RecoveryEnvCfg(G1BaseEnvCfg):
             "pitch": (-2.5, 2.5)
         }
 
-
+# Eveluation Envrironment
 @configclass
-class G1RecoveryPlayEnvCfg(G1RecoveryEnvCfg):
+class G1GaitPlayEnvCfg(G1GaitEnvCfg):
     def __post_init__(self):
         super().__post_init__()
     
