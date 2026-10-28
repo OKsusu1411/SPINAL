@@ -57,7 +57,7 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 
 import lib
-import tasks
+import nominal_policy.envs
 
 from wrapper.isaaclab_wrapper import IsaacLabWrapper
 from wrapper.record_wrapper import RecordVideo
@@ -345,7 +345,7 @@ def main():
         if task_reward is not None:
             for k, v in task_reward.items():
                 # Mean value of env axis
-                tracking_data[k].append(torch.mean(v).item())
+                tracking_data[k].append(torch.mean(v.float()).item())
 
         if len(track_rewards):
             track_reward_np = np.array(track_rewards)

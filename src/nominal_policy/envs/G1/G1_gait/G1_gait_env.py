@@ -339,9 +339,9 @@ class G1GaitEnv(G1BaseEnv):
         # joint_deviation_penalty_hip_xz     = -torch.sum(torch.abs(self.deviation_hip_xz), dim=-1)
         # joint_deviation_penalty_arm        = -torch.sum(torch.abs(self.deviation_arms), dim=1)
         # joint_deviation_penalty_torso      = -torch.sum(torch.abs(self.deviation_torso), dim=1)
-        joint_deviation_reward_hip_xz     = torch.exp(-torch.abs(self.deviation_hip_xz/ 0.5**2), dim=-1)
-        joint_deviation_reward_arm        = torch.exp(-torch.abs(self.deviation_arms/ 0.5**2), dim=1)
-        joint_deviation_reward_torso      = torch.exp(-torch.abs(self.deviation_torso/ 0.5**2), dim=1)
+        joint_deviation_reward_hip_xz     = torch.sum(torch.exp(-torch.abs(self.deviation_hip_xz/ 0.5**2)), dim=1)
+        joint_deviation_reward_arm        = torch.sum(torch.exp(-torch.abs(self.deviation_arms/ 0.5**2)), dim=1)
+        joint_deviation_reward_torso      = torch.sum(torch.exp(-torch.abs(self.deviation_torso/ 0.5**2)), dim=1)
 
         # Velocity penalty
         ang_vel_xy_penalty                 = -torch.sum(torch.square(self.root_ang_vel_b[:, :2]), dim=1)
@@ -468,12 +468,12 @@ class G1GaitEnv(G1BaseEnv):
         self._robot.reset(env_ids)
         super()._reset_idx(env_ids)
 
-        # Gait guidance (Phase scheduler)
-        self.phase[env_ids] = 0
-        self.phase_count[env_ids] = 0
-        self.update_phase_ids[env_ids] = False
-        self.command_count[env_ids] = 0
-        self.update_command_ids[env_ids] = False
+        # # Gait guidance (Phase scheduler)
+        # self.phase[env_ids] = 0
+        # self.phase_count[env_ids] = 0
+        # self.update_phase_ids[env_ids] = False
+        # self.command_count[env_ids] = 0
+        # self.update_command_ids[env_ids] = False
 
         # Gait guidance (Foot state)
         self.foot_on_swing[env_ids] = 0
