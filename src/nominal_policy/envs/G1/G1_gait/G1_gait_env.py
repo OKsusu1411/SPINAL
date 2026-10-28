@@ -307,15 +307,14 @@ class G1GaitEnv(G1BaseEnv):
         # single_contact_rewards = torch.where(is_standing,
         #                                      torch.ones_like(single_contact, dtype=torch.float),
         #                                      single_contact.float())
-        single_contact_rewards = torch.sum(single_contact, dim=-1)
+        single_contact_rewards = single_contact.float()
 
         # Feet airtime
         # TODO: 이거 intermidiate에 넣어야 깔끔할 듯
         is_contact_now = self.contact_sensors.compute_first_contact(self.step_dt)[:, self.ankle_contact_roll_link_ids]  # [E, 2]
         last_air_time = self.contact_sensors.data.last_air_time[:, self.ankle_contact_roll_link_ids]                 # [E, 2]
-        air_time = torch.sum((last_air_time - self.cfg.air_time_threshold) * is_contact_now.float(), dim=-1)
-        # air_time_rewards = torch.where(is_standing, torch.ones_like(air_time), air_time)
-        air_time_rewards = torch.sum(air_time, dim=-1)
+        air_time_rewards = torch.sum((last_air_time - self.cfg.air_time_threshold) * is_contact_now.float(), dim=-1)
+        # air_time_rewards = torch.where(is_standing, torch.ones_like(air_time_rewards), air_time_rewards)
 
         # TODO: intermidiate 참고용
         # self.air_time[i] = self.contact_sensors.data.current_air_time[i][:, self.ankle_contact_roll_link_ids] # [Left, Right]

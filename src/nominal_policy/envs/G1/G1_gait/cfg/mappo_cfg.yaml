@@ -16,7 +16,6 @@ buffer:
   buffer_size: -1
 
 agent:
-  
   class: PPO
   rollouts: 24
   learning_epochs: 5
