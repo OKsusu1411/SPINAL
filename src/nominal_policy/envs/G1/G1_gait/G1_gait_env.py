@@ -17,7 +17,7 @@ from lib.domain_randomizer.commander import UniformNonHolonomicCommand, UniformV
 from lib.env.G1.base.G1_base_env import G1BaseEnv
 from .G1_gait_env_cfg import G1GaitEnvCfg
 
-# TODO: Leg gait frequency deprecated
+# TODO: 아직 학습이 제대로 되지 않음 Reward shaping 필요
 
 class G1GaitEnv(G1BaseEnv):
     cfg: G1GaitEnvCfg

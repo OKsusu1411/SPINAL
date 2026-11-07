@@ -53,6 +53,9 @@ docker/artifacts/
 **/*.md
 !README.md
 !CLAUDE.md
+!AGENTS.md
+!solution.md
+!consult.md
 
 # Doc Outputs
 **/docs/_build/*

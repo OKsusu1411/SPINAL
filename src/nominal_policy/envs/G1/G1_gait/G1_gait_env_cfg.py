@@ -35,30 +35,35 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
     # action_scale_factor = 0.5
 
     ## ==================== Reward Shaping ==================== ##
-    w_track_lin_vel: float = 4.0
-    w_track_heading: float = 4.0
-    w_track_height : float = 1.0
-    w_feet_gait:      float = 6.0
-    w_support_xy:     float = 1.0
+    # Common rewards
     w_upright:           float = 2.0
-    w_single_contact:     float = 1.0
-    w_feet_air_time:      float = 1.0
-
-    w_lin_vel_z:          float = 2.0
+    w_track_height : float = 1.0
     w_ang_vel_xy:         float = 0.1
-    w_joint_torque:       float = 1.0e-7
-    w_joint_torque_limit: float = 1.0e-5
-    w_joint_vel:          float = 1.0e-4
+    w_lin_vel_z:          float = 2.0
+    w_termination: float = 200
 
-
-    w_limits:            float = 10.0
-    w_deviation_swing:   float = 2.0
-    w_deviation_hip:     float = 2.0
-    w_deviation_torso:   float = 2.0
+    # Arm rewards
     w_deviation_arm:     float = 2.0
+    w_limits:            float = 10.0
+    w_joint_torque_limit: float = 1.0e-5
+    w_joint_torque:       float = 1.0e-7
+    w_joint_vel:          float = 5.0e-4
+    w_deviation_torso:   float = 2.0
     w_action_rate:       float = 1.0e-3
 
-    w_termination: float = 200
+    # Leg rewards
+    w_track_lin_vel: float = 4.5
+    w_support_xy:     float = 1.0
+    w_deviation_hip:     float = 2.0
+    w_track_heading: float = 4.0
+    # w_limits
+    # w_joint_torque_limit
+    # w_joint_torque
+    # w_joint_vel
+    w_single_contact:     float = 1.0
+    w_feet_air_time:      float = 1.0
+    # w_ation_rate
+    
     termination_height: float = 0.35
     termination_gravity: float = 0.8
     termination_ang_vel: float = 20.0
