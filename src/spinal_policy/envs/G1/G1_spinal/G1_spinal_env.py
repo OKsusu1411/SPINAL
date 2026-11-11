@@ -171,23 +171,13 @@ class G1SpinalEnv(G1BaseEnv):
     def _setup_scene(self):
         super()._setup_scene()
         # clone and replicate
-        self.cfg.wall_spawn_cfg.func(
-            f"{self.scene.env_prim_paths[0]}/Wall",
-            self.cfg.wall_spawn_cfg,
-            translation=self.cfg.wall_position,
-        )
 
-        self.cfg.table_spawn_cfg.func(
-            f"{self.scene.env_prim_paths[0]}/Table",
-            self.cfg.table_spawn_cfg,
-            translation=self.cfg.table_position,
-        )
-        
+
         self.scene.clone_environments(copy_from_source=False)
         # add ground plane
         # self.cfg.terrain.num_envs = self.scene.cfg.num_envs           # TODO: 덮어쓰기 지움
         # self.cfg.terrain.env_spacing = self.scene.cfg.env_spacing
-        self.terrain = TerrainImporter(self.cfg.terrain)
+        self.terrain = TerrainImporter(self.cfg.terrain_importer_cfg)
         # add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)

@@ -7,11 +7,12 @@ from isaaclab.markers import VisualizationMarkersCfg
 from isaaclab.envs.common import ViewerCfg
 from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG
 from isaaclab.terrains import TerrainImporterCfg, TerrainGeneratorCfg
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from lib.utils.terrain_utils import *
 
+from lib.curriculum import CurriculumManagerCfg, CurriculumParamCfg
 from lib.domain_randomizer.commander import UniformVelocityCommandCfg
 from lib.env.G1.base.G1_base_env_cfg import G1BaseEnvCfg
+from lib.terrain.wall_box_terrain import *
 from lib.utils.plot_utils import PNGSavePlotter
 
 # Training Environment
@@ -125,6 +126,8 @@ class G1SpinalEnvCfg(G1BaseEnvCfg):
 
     def __post_init__(self):
         super().__post_init__()
+        
+        # Push event
         self.events.push_robot.interval_range_s = (4.0, 5.0)
         self.events.push_robot.params["velocity_range"] = {
             "x": (-0.5, 0.5), 
@@ -133,64 +136,67 @@ class G1SpinalEnvCfg(G1BaseEnvCfg):
             "pitch": (-2.5, 2.5)
         }
 
+        # Curriculum
+        num_rows = self.terrain.terrain_generator.num_rows      # Level
+        self.curriculum = CurriculumManagerCfg(
+            params=[
+                CurriculumParamCfg(
+                    name="terrain_stage",
+                    attr_path="cfg/terrain_stage",
+                    start_value=0.0,
+                    end_value=float(3 * num_rows - 1),
+                    schedule="step",
+                    schedule_kwargs={
+                        "steps": [0.8 * index / (3 * num_rows - 1) for index in range(1, 3 * num_rows)],
+                    },
+                ),
+            ],
+        )
+
     ## =============== Terrain =============== ##
     flat = FlatTerrain()
-    pyramid = PyramidStairsTerrain(border_width=0.1,
-                                    step_height_range=(0.1, 0.3),
-                                    step_width=0.2,
-                                    platform_width=0.3,
-                                    holes=False)
-    inverted_pyramid = InvertedPyramidStairsTerrain(border_width=0.1,
-                                                    step_height_range=(0.1, 0.3),
-                                                    step_width=0.2,
-                                                    platform_width=0.3,
-                                                    holes=False)
+    
+    wall_box = WallBoxTerrain(wall_distance = 2.5,
+                              box_size_range = (0.5, 0.8),
+                              box_position = (0.6, 0.6, 0.6))
+    
+    # pyramid = PyramidStairsTerrain(border_width=0.1,
+    #                                 step_height_range=(0.1, 0.3),
+    #                                 step_width=0.2,
+    #                                 platform_width=0.3,
+    #                                 holes=False)
+    # inverted_pyramid = InvertedPyramidStairsTerrain(border_width=0.1,
+    #                                                 step_height_range=(0.1, 0.3),
+    #                                                 step_width=0.2,
+    #                                                 platform_width=0.3,
+    #                                                 holes=False)
 
     terrain_generator_cfg = TerrainGeneratorCfg(
         curriculum = True,
         size=[10.0, 10.0],
-        num_rows = 1,                               # curriculum level for each terrain
-        num_cols = 6,                               # variation of terrain
+        num_rows = 3,                               # curriculum level for each terrain
+        num_cols = 1,                               # variation of terrain
         color_scheme="random",
         sub_terrains = {
-            "flat_terrain": SubTerrainBaseCfg(function=flat.generate,
-                                                proportion=0.0),
+            "floor": SubTerrainBaseCfg(function=flat.generate, proportion=1.0),
+            "wall": WallBoxTerrainCfg(function=wall_box.wall_generate(),proportion=1.0),
+            "wall_box": WallBoxTerrainCfg(function=wall_box.wall_box_generate() ,proportion=1.0)
         }
-    
     )
 
     terrain_importer_cfg = TerrainImporterCfg(
         prim_path="/World/ground",
         terrain_type="generator",
         terrain_generator=terrain_generator_cfg,
-        env_spacing=5.0,
+        env_spacing=3.0,
         physics_material=sim_utils.RigidBodyMaterialCfg(
-            static_friction=default_terrain_static_friction,
-            dynamic_friction=default_terrain_dynamic_friction,
-            restitution=default_terrain_restitution                 # Collision
-        ),
-        debug_vis=False
-    )
-
-    # Wall
-    wall_position = (1.0, 0.0, 1.0)
-    wall_spawn_cfg = sim_utils.CuboidCfg(
-        size=(0.1, 2.0, 2.0),
-        collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled=True),
-        physics_material=sim_utils.RigidBodyMaterialCfg(
+            friction_combine_mode="multiply",
+            restitution_combine_mode="average",
             static_friction=1.0,
             dynamic_friction=1.0,
-            restitution=0.0,
-            friction_combine_mode="average",
-            restitution_combine_mode="average",
+            restitution=0.3,                 # Collision
         ),
-        visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.6, 0.6, 0.6)),
-    )
-
-    # Table
-    table_position = (1.5, 0.0, 1.05)
-    table_spawn_cfg = sim_utils.UsdFileCfg(
-        usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd",
+        debug_vis=False
     )
 
 # Eveluation Envrironment
@@ -208,6 +214,8 @@ class G1SpinalPlayEnvCfg(G1SpinalEnvCfg):
             lookat=(0.0, 0.0, 0.0)
         )
 
+        self.curriculum = None
+        
         self.scene.num_envs = 1
 
         self.plotter = PNGSavePlotter
