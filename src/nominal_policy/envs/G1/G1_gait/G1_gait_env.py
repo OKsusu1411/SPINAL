@@ -100,21 +100,6 @@ class G1GaitEnv(G1BaseEnv):
 
         # Timer since single foot contact
         self.single_contact_timer = torch.zeros(self.num_envs, dtype=torch.float, device=self.device)
-        
-        # # Gait guidance (Gait scheduler)
-        # self.phase = torch.zeros(self.num_envs, device=self.device)
-        # self.phase_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device) 
-        # self.update_phase_ids = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
-
-        # self.command_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
-        # self.update_command_ids = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
-
-        # self.step_period = int(self.cfg.time_period / self.step_dt) * torch.ones(self.num_envs, dtype=torch.long, device=self.device)
-        # self.full_step_period = int(2 * self.cfg.time_period / self.step_dt) * torch.ones(self.num_envs, dtype=torch.long, device=self.device)
-
-        # self.contact_schedule = torch.zeros(self.num_envs, device=self.device)
-        # self.phase_sin = torch.zeros(self.num_envs, device=self.device)
-        # self.phase_cos = torch.zeros(self.num_envs, device=self.device)
 
         # Gait guidance (Foot State)
         self.foot_on_swing = torch.zeros(self.num_envs, 2, dtype=torch.bool, device=self.device) # True foot is on command (=swing)

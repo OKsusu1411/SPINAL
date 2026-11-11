@@ -36,11 +36,11 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
 
     ## ==================== Reward Shaping ==================== ##
     # Common rewards
-    w_upright:           float = 2.0
-    w_track_height : float = 1.0
+    w_upright:            float = 2.0
+    w_track_height :      float = 1.0
     w_ang_vel_xy:         float = 0.1
     w_lin_vel_z:          float = 2.0
-    w_termination: float = 200
+    w_termination:        float = 200
 
     # Arm rewards
     w_deviation_arm:     float = 2.0
@@ -61,7 +61,7 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
     # w_joint_torque
     # w_joint_vel
     w_single_contact:     float = 1.0
-    w_feet_air_time:      float = 1.0
+    w_feet_air_time:      float = 3.0
     # w_ation_rate
     
     termination_height: float = 0.35
@@ -72,7 +72,7 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
     time_period = 0.35
     z_c = 0.75
     single_contact_window = 0.2     # [s] look-back window for single-foot contact
-    air_time_threshold = 0.4        # [s] target swing duration
+    air_time_threshold = 1.0        # [s] target swing duration
 
     ## ============== Self collision =============== ##
     allowed_collision_bodies = ["left_ankle_pitch_link",
