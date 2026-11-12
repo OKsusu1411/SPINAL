@@ -288,7 +288,7 @@ class G1GaitEnv(G1BaseEnv):
         upright_rewards = torch.exp(-tilting / 0.2**2)
 
         # Single foot contact
-        single_contact = self.single_contact_timer <= self.cfg.single_contact_window
+        single_contact = self.single_contact_timer >= self.cfg.single_contact_window
         # single_contact_rewards = torch.where(is_standing,
         #                                      torch.ones_like(single_contact, dtype=torch.float),
         #                                      single_contact.float())
@@ -527,10 +527,10 @@ class G1GaitEnv(G1BaseEnv):
             # Update only reset env
             self.single_contact_timer[i] = 0.0
         else:
-            # Add step_dt into timer
+            # Add step_dt into timer when single foot contact
             self.single_contact_timer[i] = torch.where(single_contact,
-                                                            torch.zeros_like(self.single_contact_timer[i]),
-                                                            self.single_contact_timer[i] + self.step_dt)
+                                                       self.single_contact_timer[i] + self.step_dt,
+                                                       torch.zeros_like(self.single_contact_timer[i]))
             
         # # Gait guidance (Phase scheduler)
         # self.foot_pos_w[i] = self._robot.data.body_link_pos_w[i][:, self.ankle_x_link_ids] # [Left, Right]

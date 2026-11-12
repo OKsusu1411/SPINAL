@@ -52,15 +52,15 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
     w_action_rate:       float = 1.0e-3
 
     # Leg rewards
-    w_track_lin_vel: float = 4.5
+    w_track_lin_vel: float = 6.0
     w_support_xy:     float = 1.0
-    w_deviation_hip:     float = 2.0
+    w_deviation_hip:     float = 1.0
     w_track_heading: float = 4.0
     # w_limits
     # w_joint_torque_limit
     # w_joint_torque
     # w_joint_vel
-    w_single_contact:     float = 1.0
+    w_single_contact:     float = 2.0
     w_feet_air_time:      float = 3.0
     # w_ation_rate
     
@@ -71,8 +71,8 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
     # ===== Gait guidance ===== #
     time_period = 0.35
     z_c = 0.75
-    single_contact_window = 0.2     # [s] look-back window for single-foot contact
-    air_time_threshold = 1.0        # [s] target swing duration
+    single_contact_window = 0.3     # [s] single-foot contact minimum threshold
+    air_time_threshold = 0.6        # [s] target swing duration
 
     ## ============== Self collision =============== ##
     allowed_collision_bodies = ["left_ankle_pitch_link",
