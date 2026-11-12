@@ -174,6 +174,11 @@ class G1SpinalEnv(G1BaseEnv):
         self.scene.clone_environments(copy_from_source=False)
         self.terrain = TerrainImporter(self.cfg.terrain_importer_cfg)
 
+        # Initialize terrain
+        self.terrain.terrain_levels.zero_()
+        self.terrain.terrain_types.zero_()
+        self.terrain.env_origins[:] = self.terrain.terrain_origins[0, 0]
+        self.scene.env_origins.copy_(self.terrain.env_origins)
 
         # add ground plane
         # self.cfg.terrain.num_envs = self.scene.cfg.num_envs           # TODO: 덮어쓰기 지움
@@ -435,20 +440,31 @@ class G1SpinalEnv(G1BaseEnv):
         died = (died_fall & died_collision) | died_ang
         return died, time_out
 
+    # def _assign_terrain(self, env_ids: torch.Tensor):
+    #     # Read the number of rows from the generated origin matrix.
+    #     num_curriculum = self.terrain.terrain_origins.shape[0]          # Row = Curriculum difficulty
+    #     # Clamp the scheduled scalar to valid matrix stages.
+    #     target_stage = min(max(round(self.cfg.terrain_stage), 0), 3 * num_curriculum - 1)
+    #     # Recover each robot's currently applied stage.
+    #     current_stage = self.terrain.terrain_types[env_ids] * num_curriculum + self.terrain.terrain_levels[env_ids]
+
+    #     self.terrain.t
+    #     # Preserve intermediate stages if the time schedule has advanced faster.
+    #     next_stage = torch.clamp(current_stage + 1, max=target_stage)
+    #     self.terrain.terrain_levels[env_ids] = next_stage % num_curriculum
+    #     self.terrain.terrain_types[env_ids] = torch.div(next_stage, num_curriculum, rounding_mode="floor")
+    #     self.terrain.env_origins[env_ids] = self.terrain.terrain_origins[
+    #         self.terrain.terrain_levels[env_ids], self.terrain.terrain_types[env_ids]
+    #     ]
+    #     self.scene.env_origins[env_ids] = self.terrain.env_origins[env_ids]
 
     def _reset_idx(self, env_ids: torch.Tensor | None):
         if env_ids is None or len(env_ids) == self.num_envs:
             env_ids = self._robot._ALL_INDICES
         # Randomization by Event-based randomizer
         self._robot.reset(env_ids)
-        super()._reset_idx(env_ids)
 
-        # # Gait guidance (Phase scheduler)
-        # self.phase[env_ids] = 0
-        # self.phase_count[env_ids] = 0
-        # self.update_phase_ids[env_ids] = False
-        # self.command_count[env_ids] = 0
-        # self.update_command_ids[env_ids] = False
+        super()._reset_idx(env_ids)
 
         # Gait guidance (Foot state)
         self.foot_on_swing[env_ids] = 0

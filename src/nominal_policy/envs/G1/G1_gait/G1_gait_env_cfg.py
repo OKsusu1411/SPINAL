@@ -60,8 +60,8 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
     # w_joint_torque_limit
     # w_joint_torque
     # w_joint_vel
-    w_single_contact:     float = 2.0
-    w_feet_air_time:      float = 3.0
+    w_single_contact:     float = 0.0
+    w_feet_air_time:      float = 0.0
     # w_ation_rate
     
     termination_height: float = 0.35
