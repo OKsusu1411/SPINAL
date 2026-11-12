@@ -43,25 +43,25 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
     w_termination:        float = 200
 
     # Arm rewards
-    w_deviation_arm:     float = 2.0
+    w_deviation_arm:     float = 0.0
     w_limits:            float = 10.0
     w_joint_torque_limit: float = 1.0e-5
     w_joint_torque:       float = 1.0e-7
     w_joint_vel:          float = 5.0e-4
-    w_deviation_torso:   float = 2.0
+    w_deviation_torso:   float = 0.0
     w_action_rate:       float = 1.0e-3
 
     # Leg rewards
     w_track_lin_vel: float = 6.0
-    w_support_xy:     float = 1.0
+    w_support_xy:     float = 0.0
     w_deviation_hip:     float = 1.0
     w_track_heading: float = 4.0
     # w_limits
     # w_joint_torque_limit
     # w_joint_torque
     # w_joint_vel
-    w_single_contact:     float = 0.0
-    w_feet_air_time:      float = 0.0
+    w_single_contact:     float = 1.0
+    w_feet_air_time:      float = 1.0
     # w_ation_rate
     
     termination_height: float = 0.35
