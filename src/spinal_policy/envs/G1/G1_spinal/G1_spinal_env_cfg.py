@@ -21,7 +21,7 @@ class G1SpinalEnvCfg(G1BaseEnvCfg):
     ## ==================== Environment parameters ==================== ##
     episode_length_s = 10.0
     sim_dt = 1/200
-    decimation = 4         
+    decimation = 2         
 
     ## ========== Multi Agent Setting =========== ##
     possible_agents = ["arm", "leg"]
@@ -94,8 +94,8 @@ class G1SpinalEnvCfg(G1BaseEnvCfg):
     # Commander
     commands: UniformVelocityCommandCfg = UniformVelocityCommandCfg(
         asset_name="robot",
-        resampling_time_range=(4.0, 5.0),
-        prob_standing_envs=0.0,
+        resampling_time_range=(0.0, 0.0),
+        prob_standing_envs=0.3,
         prob_heading_envs=0.0,
         heading_command=False,
         heading_control_stiffness=0.0,
@@ -137,7 +137,8 @@ class G1SpinalEnvCfg(G1BaseEnvCfg):
         }
 
         # Curriculum
-        num_rows = self.terrain.terrain_generator.num_rows      # Level
+        num_rows = self.terrain_importer_cfg.terrain_generator.num_rows      # Level
+        terrain_stage = 0.0
         self.curriculum = CurriculumManagerCfg(
             params=[
                 CurriculumParamCfg(
@@ -175,12 +176,12 @@ class G1SpinalEnvCfg(G1BaseEnvCfg):
         curriculum = True,
         size=[10.0, 10.0],
         num_rows = 3,                               # curriculum level for each terrain
-        num_cols = 1,                               # variation of terrain
+        num_cols = 3,                               # variation of terrain
         color_scheme="random",
         sub_terrains = {
             "floor": SubTerrainBaseCfg(function=flat.generate, proportion=1.0),
-            "wall": WallBoxTerrainCfg(function=wall_box.wall_generate(),proportion=1.0),
-            "wall_box": WallBoxTerrainCfg(function=wall_box.wall_box_generate() ,proportion=1.0)
+            "wall": WallBoxTerrainCfg(function=wall_box.wall_generate, proportion=1.0),
+            "wall_box": WallBoxTerrainCfg(function=wall_box.wall_box_generate, proportion=1.0)
         }
     )
 
@@ -215,7 +216,7 @@ class G1SpinalPlayEnvCfg(G1SpinalEnvCfg):
         )
 
         self.curriculum = None
-        
+
         self.scene.num_envs = 1
 
         self.plotter = PNGSavePlotter

@@ -1,120 +1,180 @@
-# G1GaitEnv Reward shaping
+# G1SpinalEnv terrain spawn 검증 스크립트
 
-## Requirement
-일반적으로 humanoid gait RL에서 발생하는 문제 중 하나는 hopping입니다.
-Velocity tracking reward만으로 학습하면 로봇이 양발로 동시에 점프하면서 이동하는 동작을 발견할 수 있습니다.
-이를 방지하기 위해 논문에서는 single-foot contact를 유도합니다.
-$$[ r_{\mathrm{contact}}= \begin{cases} 1,&\text{Standing command}\\ 1,&\exists t'\in[t-0.2,t]:n_c(t')=1\\ 0,&\text{Otherwise} \end{cases} \
-$$
-여기서 $n_c$는 지면에 접촉한 발의 개수입니다.
-즉 walking 중에는 최근 0.2초 안에 한쪽 발만 접촉한 순간이 있으면 reward를 제공합니다.
-흥미로운 점은 standing 상태에서 양발 접촉을 강제하지 않는다는 것입니다.
-Standing command에서는 reward를 상수 1로 제공합니다.
-그 이유는 외부 disturbance 발생 시 recovery stepping을 허용하기 위해서입니다.
-저자들은 양발 접촉을 강하게 reward하면 넘어지지 않기 위해 발을 들어야 하는 상황에서도 foot contact를 유지하려는 부작용이 나타날 수 있다고 설명합니다.
+## Conclusion
 
+env 전체를 띄우지 않고 **terrain만 단독으로 생성해 검사하는 스크립트** `src/spinal_policy/main/check_terrain.py`를 새로 추가합니다.
 
-논문의 air-time reward는 다음과 같습니다.
-$$
- r_{\mathrm{air}}= \begin{cases} 1,&\text{Standing}\\ \displaystyle\sum_{f\in\{L,R\}} (T_{\mathrm{air},f}-0.4) \mathbb 1_{\mathrm{touchdown},f}, &\text{Walking} \end{cases}
-$$
-Weight는
-$w_{\mathrm{air}}=1.0$
-입니다.
-여기서 $T_{\mathrm{air},f}$는 해당 발의 touchdown 직전 swing duration입니다.
-이 reward는
-$T_{\mathrm{air},f}-0.4$
-를 사용하므로, air time이 0.4초보다 짧으면 음수이고 길면 양수입니다.
-따라서 짧은 주기로 발을 반복적으로 디디는 행동을 억제하고, 적절한 swing duration을 갖도록 유도합니다.
+- `G1SpinalEnv`는 아직 미정의 속성(`single_contact_timer` 등)과 태스크 미등록 때문에 실행되지 않습니다. 그래서 env를 거치지 않고 `G1SpinalEnvCfg.terrain_importer_cfg`만 꺼내 씁니다. 실제 학습과 같은 cfg를 쓰므로 검증 결과가 그대로 유효합니다.
+- 기존 코드는 수정하지 않습니다. 새 파일 1개만 추가합니다.
+- 현재 상태로 돌리면 **wall_box column 생성에서 실패할 것으로 예상합니다.** `AISL-RL/src/lib/terrain/wall_box_terrain.py:56`이 없는 필드 `cfg.box_size`를 참조하기 때문입니다 (L57의 `np.array([cfg.box_position])`도 shape이 `(1, 3)`). 이 스크립트가 그 실패를 가장 먼저 드러내며, submodule 쪽 수정 후 다시 돌리면 됩니다.
 
----
+## Logic
 
-## 구현 방안
+검사는 3단계입니다. 1~2단계는 수치 검사라 headless로 끝나고, 3단계는 GUI에서 눈으로 확인합니다.
 
-### 0. 사전 확인 사항 (현재 코드 기준)
-- 발 contact 정보: `self.ankle_contact_roll_link_ids` (`[Left, Right]`), contact sensor는 `track_air_time=True`, `update_period = sim_dt` 로 설정되어 있음 → Isaac Lab `ContactSensor`의 `current_contact_time`, `last_air_time`, `compute_first_contact(dt)`를 그대로 사용 가능.
-- Policy step은 `step_dt = sim_dt * decimation = 0.02s`. Touchdown 판정은 반드시 `step_dt`로 해야 함 (`sim_dt`로 하면 decimation 중간에 발생한 touchdown을 놓침).
-- Standing command 판별: `UniformVelocityCommand.is_standing_env`가 있으나, resampling 외 경로로 0 command가 들어오는 경우까지 포괄하도록 command norm 기반으로 판별하는 것을 권장.
-  ```python
-  is_standing = torch.norm(self.command_inputs_b[:, :2], dim=-1) < self.cfg.standing_cmd_threshold
-  ```
-  (현재 `ang_vel_z` range가 0이므로 xy만 사용. yaw command를 쓰게 되면 `command_inputs_b[:, 2]`도 포함.)
+1. **Grid 구조**: `TerrainGenerator`를 직접 만들어 `terrain_origins.shape == (num_rows, 3, 3)`인지 확인합니다. column 수가 sub-terrain 수(floor / wall / wall_box)와 같아야 합니다.
+2. **칸별 형상**: 전체 terrain mesh에서 각 칸 영역(origin ± size/2) 안의 vertex 중 바닥보다 높은 것(`z > 0.01`)만 골라, origin 기준 상대 좌표의 bounding box를 구합니다.
+   - floor: 솟은 vertex가 없어야 합니다.
+   - wall: 솟은 vertex의 범위가 cfg 값과 일치해야 합니다. x는 `wall_distance ± wall_size[0]/2`, y는 `± wall_size[1]/2`, 최대 z는 `wall_size[2]`.
+   - wall_box: wall 조건에 더해, wall보다 앞쪽(x가 wall 앞면보다 작은 영역)에 솟은 vertex(= box)가 있어야 합니다.
+   - 모든 칸의 bounds를 표로 출력하므로 assert가 통과해도 값을 직접 볼 수 있습니다.
+3. **Stage → origin 매핑 + 실제 spawn**: `SimulationContext`와 `TerrainImporter`로 stage에 실제로 spawn한 뒤, env의 `_update_terrain_origins`와 같은 식(`level = stage % num_rows`, `type = stage // num_rows`)으로 stage 0~8의 origin을 출력합니다. `--headless`가 아니면 창을 유지해 육안으로 확인할 수 있습니다.
 
-### 1. Config 추가 (`G1_gait_env_cfg.py`)
+`TerrainImporter`는 내부 generator를 보관하지 않아 mesh를 꺼낼 수 없습니다. 그래서 2단계용 generator를 따로 한 번 더 만듭니다. 형상은 seed와 무관하게 결정적이므로 두 결과는 같습니다.
+
+## Code
+
+### 새 파일: `src/spinal_policy/main/check_terrain.py`
+
 ```python
-    ## ==================== Reward Shaping ==================== ##
-    w_single_contact:     float = 1.0
-    w_feet_air_time:      float = 1.0
+"""Verify that the G1-spinal terrain grid (floor / wall / wall_box) is generated and spawned correctly."""
 
-    # ===== Gait guidance ===== #
-    single_contact_window: float = 0.2    # [s] look-back window for single-foot contact
-    air_time_threshold:    float = 0.4    # [s] target swing duration
-    standing_cmd_threshold: float = 0.1   # [m/s] command norm below this is treated as standing
+import argparse
+
+from isaaclab.app import AppLauncher
+
+# CLI arguments (AppLauncher adds --headless, --device, ...)
+parser = argparse.ArgumentParser(description="Check the G1-spinal terrain grid.")
+AppLauncher.add_app_launcher_args(parser)
+args_cli = parser.parse_args()
+
+# Launch the simulator before importing any isaaclab module
+app_launcher = AppLauncher(args_cli)
+simulation_app = app_launcher.app
+
+"""Rest everything follows."""
+
+import numpy as np
+
+import isaaclab.sim as sim_utils
+from isaaclab.terrains import TerrainGenerator, TerrainImporter
+
+from spinal_policy.envs.G1.G1_spinal.G1_spinal_env_cfg import G1SpinalEnvCfg
+
+# Height above which a vertex counts as an obstacle (not floor)
+RAISED_Z = 0.01
+# Tolerance for geometry comparison [m]
+TOL = 1e-3
+
+
+def raised_bounds(vertices: np.ndarray, origin: np.ndarray, size: tuple[float, float]) -> np.ndarray | None:
+    """Return origin-relative [min, max] bounds of the raised vertices inside one tile, or None if flat."""
+    # Vertices relative to the tile origin
+    rel = vertices - origin
+    # Mask of raised vertices inside the tile footprint
+    mask = (np.abs(rel[:, 0]) < size[0] / 2) & (np.abs(rel[:, 1]) < size[1] / 2) & (rel[:, 2] > RAISED_Z)
+    if not mask.any():
+        return None
+    return np.stack([rel[mask].min(axis=0), rel[mask].max(axis=0)])
+
+
+def check_geometry(gen_cfg) -> None:
+    """Check the grid shape and the per-tile geometry of the generated terrain mesh."""
+    # Stand-alone generator (the importer does not keep its mesh)
+    generator = TerrainGenerator(cfg=gen_cfg, device="cpu")
+    # Tile origins, shape (num_rows, num_cols, 3)
+    origins = generator.terrain_origins
+    # All vertices of the merged terrain mesh
+    vertices = np.asarray(generator.terrain_mesh.vertices)
+    # Sub-terrain names in column order
+    names = list(gen_cfg.sub_terrains.keys())
+
+    # 1. Grid structure: one column per sub-terrain type
+    assert origins.shape == (gen_cfg.num_rows, len(names), 3), f"unexpected terrain_origins shape {origins.shape}"
+    print(f"[OK] terrain_origins shape = {origins.shape}")
+
+    # 2. Per-tile geometry
+    for col, name in enumerate(names):
+        # Sub-terrain config of this column
+        sub_cfg = gen_cfg.sub_terrains[name]
+        for row in range(gen_cfg.num_rows):
+            bounds = raised_bounds(vertices, origins[row, col], gen_cfg.size)
+            print(f"  [{name:8s}] row={row} origin={np.round(origins[row, col], 2)} raised bounds=\n{bounds}")
+
+            if name == "floor":
+                assert bounds is None, f"floor tile (row {row}) has raised geometry"
+                continue
+
+            assert bounds is not None, f"{name} tile (row {row}) has no raised geometry"
+            # Expected wall extents relative to the tile origin
+            wall_x_near = sub_cfg.wall_distance - sub_cfg.wall_size[0] / 2
+            wall_x_far = sub_cfg.wall_distance + sub_cfg.wall_size[0] / 2
+            assert abs(bounds[1, 0] - wall_x_far) < TOL, f"{name}: wall far face at x={bounds[1, 0]:.3f}"
+            assert abs(bounds[1, 2] - sub_cfg.wall_size[2]) < TOL or bounds[1, 2] > sub_cfg.wall_size[2], \
+                f"{name}: wall top at z={bounds[1, 2]:.3f}"
+
+            if name == "wall":
+                # Only the wall is raised
+                assert abs(bounds[0, 0] - wall_x_near) < TOL, f"wall near face at x={bounds[0, 0]:.3f}"
+                assert abs(bounds[0, 1] + sub_cfg.wall_size[1] / 2) < TOL, f"wall y-min at {bounds[0, 1]:.3f}"
+                assert abs(bounds[1, 1] - sub_cfg.wall_size[1] / 2) < TOL, f"wall y-max at {bounds[1, 1]:.3f}"
+            else:
+                # The box must add raised geometry in front of the wall
+                assert bounds[0, 0] < wall_x_near - TOL, "wall_box tile has no box in front of the wall"
+    print("[OK] per-tile geometry matches the config")
+
+
+def check_spawn(importer_cfg) -> None:
+    """Spawn the terrain on the stage and print the origin selected by each curriculum stage."""
+    # Simulation context required by the importer
+    sim = sim_utils.SimulationContext(sim_utils.SimulationCfg(dt=0.005, device=args_cli.device))
+    # Spawn the terrain mesh under /World/ground
+    terrain = TerrainImporter(importer_cfg)
+    # Light for visual inspection
+    light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
+    light_cfg.func("/World/Light", light_cfg)
+
+    # 3. Stage -> origin mapping (same decoding as G1SpinalEnv._update_terrain_origins)
+    num_levels, num_types = terrain.terrain_origins.shape[:2]
+    # Sub-terrain names in column order
+    names = list(importer_cfg.terrain_generator.sub_terrains.keys())
+    for stage in range(num_levels * num_types):
+        level, terrain_type = stage % num_levels, stage // num_levels
+        origin = terrain.terrain_origins[level, terrain_type].cpu().numpy()
+        print(f"  stage {stage}: {names[terrain_type]:8s} level={level} origin={np.round(origin, 2)}")
+    print("[OK] terrain spawned at", importer_cfg.prim_path)
+
+    # Keep the window open for visual inspection
+    if not args_cli.headless:
+        sim.set_camera_view(eye=(25.0, 25.0, 20.0), target=(0.0, 0.0, 0.0))
+        sim.reset()
+        while simulation_app.is_running():
+            sim.step()
+
+
+def main():
+    # Same terrain config as the training environment
+    importer_cfg = G1SpinalEnvCfg().terrain_importer_cfg
+    check_geometry(importer_cfg.terrain_generator)
+    check_spawn(importer_cfg)
+
+
+if __name__ == "__main__":
+    main()
+    simulation_app.close()
 ```
 
-### 2. 버퍼 추가 (`__init__`)
-`[t-0.2, t]` 구간 안에 `n_c = 1`인 순간이 있었는지 알기 위해 히스토리 전체를 저장할 필요 없이, **"마지막으로 single contact였던 시점으로부터 경과한 시간"** 하나만 들고 있으면 됨.
-```python
-        # Gait guidance (Single foot contact)
-        self.time_since_single_contact = torch.zeros(self.num_envs, dtype=torch.float, device=self.device)
+### 실행
+
+```bash
+# 수치 검사만 (1~3단계 출력 후 종료)
+python src/spinal_policy/main/check_terrain.py --headless
+# GUI에서 육안 확인까지
+python src/spinal_policy/main/check_terrain.py
 ```
 
-### 3. 중간값 갱신 (`_compute_intermediate_values`)
-`self.in_contact` 계산 직후에 추가:
-```python
-        # Single foot contact timer: reset to zero when exactly one foot is in contact
-        num_contacts = torch.sum(self.in_contact[i], dim=-1)    # [E]
-        single_contact = num_contacts == 1
-        if env_ids is not None:
-            # Grace period after reset (robot spawns in double support)
-            self.time_since_single_contact[i] = 0.0
-        else:
-            self.time_since_single_contact[i] = torch.where(single_contact,
-                                                            torch.zeros_like(self.time_since_single_contact[i]),
-                                                            self.time_since_single_contact[i] + self.step_dt)
-```
-- reset 시 0으로 두어 초기 양발 지지 상태에서 첫 0.2s 동안은 reward를 주도록 함 (원치 않으면 `single_contact_window` 보다 큰 값으로 초기화).
-- `_get_dones()` 에서 매 step 1회 `_compute_intermediate_values()`가 호출되므로 timer는 step 당 정확히 `step_dt`씩 증가.
+## 판정 기준
 
-### 4. Reward 계산 (`_get_rewards`)
-기존 placeholder 위치(`# Single foot contact`, `# Feet airtime`)에 작성:
-```python
-        # Standing mask
-        is_standing = torch.norm(self.command_inputs_b[:, :2], dim=-1) < self.cfg.standing_cmd_threshold
+| 출력 | 의미 |
+|---|---|
+| `[OK] terrain_origins shape = (3, 3, 3)` | 3 type × 3 level grid가 생성됨 |
+| `[OK] per-tile geometry matches the config` | floor는 평지, wall은 cfg 위치·크기, wall_box는 wall + box |
+| stage 0~8 표 | stage 0~2 floor, 3~5 wall, 6~8 wall_box 순으로 서로 다른 origin |
+| `AttributeError: ... 'box_size'` | 위 Conclusion의 submodule 버그. `wall_box_terrain.py` 수정 필요 |
 
-        # Single foot contact
-        single_contact = self.time_since_single_contact <= self.cfg.single_contact_window
-        single_contact_rewards = torch.where(is_standing,
-                                             torch.ones_like(single_contact, dtype=torch.float),
-                                             single_contact.float())
+GUI에서는 y 방향으로 floor → wall → wall_box 세 줄이, x 방향으로 level 3칸이 보여야 하고, wall은 각 칸 중심에서 +x로 2.5 m 떨어져 있어야 합니다.
 
-        # Feet airtime
-        first_contact = self.contact_sensors.compute_first_contact(self.step_dt)[:, self.ankle_contact_roll_link_ids]  # [E, 2]
-        last_air_time = self.contact_sensors.data.last_air_time[:, self.ankle_contact_roll_link_ids]                 # [E, 2]
-        air_time = torch.sum((last_air_time - self.cfg.air_time_threshold) * first_contact.float(), dim=-1)
-        air_time_rewards = torch.where(is_standing, torch.ones_like(air_time), air_time)
-```
-- `compute_first_contact(step_dt)`: 이번 policy step 안에서 contact가 새로 시작된 발 = $\mathbb 1_{\mathrm{touchdown},f}$.
-- `last_air_time`: touchdown 시점에 직전 swing duration으로 갱신됨 = $T_{\mathrm{air},f}$.
-- 따라서 reward는 touchdown이 일어난 step에만 non-zero (sparse) 값을 가짐.
+## 한계
 
-### 5. Reward 합산 및 로깅
-보행 패턴(발 접촉)과 관련된 항이므로 `leg_specific_rewards`에 포함:
-```python
-        leg_specific_rewards = self.cfg.w_track_lin_vel       * lin_vel_rewards                 + \
-                               self.cfg.w_single_contact      * single_contact_rewards          + \
-                               self.cfg.w_feet_air_time       * air_time_rewards                + \
-                               ...
-```
-`self.extras["reward"]`에 추가:
-```python
-            "Task Reward / Leg_Single_Contact"     : single_contact_rewards,
-            "Task Reward / Leg_Feet_Air_Time"      : air_time_rewards,
-```
-(air time 항은 음수도 가지므로 Reward/Penalty 어느 쪽에 두든 상관없으나, standing 시 +1이므로 Reward 쪽에 둠.)
-
-### 6. 주의 사항
-1. **Gait scheduler와 threshold 충돌**: 현재 `time_period = 0.35`로 swing foot가 0.35s 마다 교대됨 → 실제 swing(air) 시간은 최대 ~0.35s 미만. `air_time_threshold = 0.4`를 그대로 쓰면 $T_{\mathrm{air}} - 0.4 < 0$ 이 항상 성립하여 **사실상 매 touchdown마다 penalty만 주는 항**이 됨. 논문 값(0.4)을 유지하려면 `time_period`를 늘리거나, threshold를 `time_period` 이하(예: 0.3)로 맞추는 것을 권장. threshold를 cfg로 뺀 이유.
-2. **Standing reward 상수 1**: 두 항 모두 standing 시 1을 주므로 standing env 비율(`prob_standing_envs`)이 올라가면 walking env 대비 reward scale 차이가 생김. 현재 `prob_standing_envs=0.0`이라 영향 없음.
-3. **Reset 직후 touchdown**: 스폰 높이가 지면보다 약간 높으면 첫 touchdown에서 짧은 air time으로 작은 penalty가 들어갈 수 있음 (무시 가능한 수준).
-4. **Contact 판정 기준**: `self.in_contact`(contact time 기반)를 사용. Force threshold 기반의 `self.is_contacts`(history max)는 3 substep history를 보므로 판정이 더 관대함 → single contact 판정이 흐려질 수 있어 `in_contact` 권장.
+- 이 스크립트는 **terrain 생성과 stage→origin 식**만 검증합니다. 로봇이 reset 시 실제로 그 origin에 놓이는지(`_reset_idx` 순서, `scene.env_origins` 갱신)는 env가 실행 가능해진 뒤 `root_pos_w[:, :2]`와 `terrain_origins`를 비교해 따로 확인해야 합니다.
+- wall top 검사는 wall_box 칸에서 box가 wall보다 높을 경우도 통과하도록 `>=`로 두었습니다.
