@@ -323,9 +323,9 @@ class G1GaitEnv(G1BaseEnv):
         # joint_deviation_penalty_hip_xz     = -torch.sum(torch.abs(self.deviation_hip_xz), dim=-1)
         # joint_deviation_penalty_arm        = -torch.sum(torch.abs(self.deviation_arms), dim=1)
         # joint_deviation_penalty_torso      = -torch.sum(torch.abs(self.deviation_torso), dim=1)
-        joint_deviation_reward_hip_xz     = torch.sum(torch.exp(-torch.abs(self.deviation_hip_xz/ 0.5**2)), dim=1)
-        joint_deviation_reward_arm        = torch.sum(torch.exp(-torch.abs(self.deviation_arms/ 0.5**2)), dim=1)
-        joint_deviation_reward_torso      = torch.sum(torch.exp(-torch.abs(self.deviation_torso/ 0.5**2)), dim=1)
+        joint_deviation_reward_hip_xz     = torch.sum(torch.exp(-torch.abs(self.deviation_hip_xz/ 1.0**2)), dim=1)
+        joint_deviation_reward_arm        = torch.sum(torch.exp(-torch.abs(self.deviation_arms/ 1.0**2)), dim=1)
+        joint_deviation_reward_torso      = torch.sum(torch.exp(-torch.abs(self.deviation_torso/ 1.0**2)), dim=1)
 
         # Velocity penalty
         ang_vel_xy_penalty                 = -torch.sum(torch.square(self.root_ang_vel_b[:, :2]), dim=1)

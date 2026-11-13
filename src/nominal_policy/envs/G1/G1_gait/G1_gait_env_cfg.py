@@ -39,11 +39,11 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
     w_upright:            float = 2.0
     w_track_height :      float = 1.0
     w_ang_vel_xy:         float = 0.1
-    w_lin_vel_z:          float = 2.0
+    w_lin_vel_z:          float = 0.1
     w_termination:        float = 200
 
     # Arm rewards
-    w_deviation_arm:     float = 0.0
+    w_deviation_arm:     float = 1.0
     w_limits:            float = 10.0
     w_joint_torque_limit: float = 1.0e-5
     w_joint_torque:       float = 1.0e-7
@@ -72,7 +72,7 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
     time_period = 0.35
     z_c = 0.75
     single_contact_window = 0.3     # [s] single-foot contact minimum threshold
-    air_time_threshold = 0.6        # [s] target swing duration
+    air_time_threshold = 0.5        # [s] target swing duration
 
     ## ============== Self collision =============== ##
     allowed_collision_bodies = ["left_ankle_pitch_link",
@@ -91,7 +91,7 @@ class G1GaitEnvCfg(G1BaseEnvCfg):
         heading_command=False,
         heading_control_stiffness=0.0,
         ranges=UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.5, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-0.0, 0.0), heading=(0.0, 0.0)
+            lin_vel_x=(0.4, 1.2), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-0.0, 0.0), heading=(0.0, 0.0)
         ),
     )
 
