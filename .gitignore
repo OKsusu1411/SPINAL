@@ -48,6 +48,7 @@ docker/.container.cfg
 docker/artifacts/
 *.tmp
 *.csv
+**/.agentbus/*
 
 # Claude
 **/*.md
