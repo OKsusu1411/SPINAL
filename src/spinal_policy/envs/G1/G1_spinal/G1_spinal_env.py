@@ -8,7 +8,6 @@ import torch
 import copy
 
 import isaaclab.sim as sim_utils
-from isaaclab.terrains import TerrainImporter
 from isaaclab.markers import VisualizationMarkers
 
 from isaaclab.utils.math import quat_apply_inverse, yaw_quat, euler_xyz_from_quat, quat_apply, matrix_from_quat
@@ -170,18 +169,15 @@ class G1SpinalEnv(G1BaseEnv):
         super()._setup_scene()
         # clone and replicate
         self.scene.clone_environments(copy_from_source=False)
-        self.cfg.terrain_importer_cfg.num_envs = self.scene.cfg.num_envs
-        self.terrain = TerrainImporter(self.cfg.terrain_importer_cfg)
+        self.terrain_origins = self.cfg.terrain_api.spawn_tiles(self.cfg, self.device)    # (num_variants, 3, 3) tile centers
+        # Isaac Lab filters inter-env collisions automatically only for GPU replicated physics
+        if (not self.scene.cfg.replicate_physics and self.scene.cfg.filter_collisions) or self.device == "cpu":
+            self.scene.filter_collisions(global_prim_paths=[self.cfg.terrain_prim_path])
 
-        # Initialize terrain
-        self.terrain.terrain_levels.zero_()
-        self.terrain.terrain_types.zero_()
-        self.terrain.env_origins[:] = self.terrain.terrain_origins[0, 0]
-        self.scene.env_origins.copy_(self.terrain.env_origins)
-
-        # add ground plane
-        # self.cfg.terrain.num_envs = self.scene.cfg.num_envs           # TODO: 덮어쓰기 지움
-        # self.cfg.terrain.env_spacing = self.scene.cfg.env_spacing
+        # Per-env selected terrain type and variant
+        self.terrain_types = torch.zeros(self.scene.num_envs, dtype=torch.long, device=self.device)
+        self.terrain_variants = torch.zeros(self.scene.num_envs, dtype=torch.long, device=self.device)
+        self._update_terrain_origins(torch.arange(self.scene.num_envs, device=self.device))
         # add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
@@ -440,17 +436,18 @@ class G1SpinalEnv(G1BaseEnv):
         return died, time_out
 
     def _update_terrain_origins(self, env_ids: torch.Tensor):
-        """Move the reset envs to the terrain tile of the current curriculum stage."""
-        # Terrain grid shape: rows = levels, cols = terrain types
-        num_levels, num_types = self.terrain.terrain_origins.shape[:2]
-        # Scheduled stage clamped to the valid grid range
-        stage = min(max(round(self.cfg.terrain_stage), 0), num_levels * num_types - 1)
-        # Decode stage = type * num_levels + level
-        self.terrain.terrain_levels[env_ids] = stage % num_levels
-        self.terrain.terrain_types[env_ids] = stage // num_levels
-        # Update origins of both the terrain importer and the scene (read by reset events)
-        self.terrain.env_origins[env_ids] = self.terrain.terrain_origins[stage % num_levels, stage // num_levels]
-        self.scene.env_origins[env_ids] = self.terrain.env_origins[env_ids]
+        """Sample a prepared tile for each reset env according to the curriculum stage."""
+        # Global stage: 0=Floor, 1=Wall, 2=Wall+Box, 3=mix of all types
+        stage = min(max(round(self.cfg.terrain_stage), 0), 3)
+        variants = torch.randint(self.cfg.terrain_num_variants, (env_ids.numel(),), device=self.device)
+        if stage == 3:
+            terrain_types = torch.randint(3, (env_ids.numel(),), device=self.device)
+        else:
+            terrain_types = torch.full_like(variants, stage)
+        self.terrain_variants[env_ids] = variants
+        self.terrain_types[env_ids] = terrain_types
+        # Reset events read scene.env_origins as the spawn reference
+        self.scene.env_origins[env_ids] = self.terrain_origins[variants, terrain_types]
 
     def _reset_idx(self, env_ids: torch.Tensor | None):
         if env_ids is None or len(env_ids) == self.num_envs:
